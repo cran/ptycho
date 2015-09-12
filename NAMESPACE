@@ -1,0 +1,9 @@
+importFrom(coda, mcmc, mcmc.list)
+importFrom(reshape2, melt)
+importFrom("stats", "cor", "dnorm", "pnorm", "rbeta", "rbinom", "rnorm", "runif")
+import(plyr, foreach, doMC, doRNG)
+export(createOrthogonalX, createGroupsSim, createData, createDataBayesModel,
+       createPubData, indicVarCols, indicGrpCols, ptycho, ptycho.all, mcmcLoop,
+       meanTau, varTau, meanIndicators, meanVarIndicators, meanGrpIndicators,
+       checkConvergence)
+S3method(print,ptycho)
