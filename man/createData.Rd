@@ -12,15 +12,16 @@ createDataBayesModel(mode = c("exchange","pleiotropy","gene"), n, p, q,
                      nreps, tau.min, tau.max, G)
 createPubData(mode = c("tinysim","ptychoIn",
                        "exchange","pleiotropy","gene",
-                       "actualGeno","actualPheno",
+                       "actualGeno","actualPheno","corTest",
                        "fixedOmega","uniformEffects"),
-              X=NULL, y=NULL, var.detail=NULL)
+              X=NULL, y=NULL, var.detail=NULL, variants=NULL)
 }
 \arguments{
   \item{X}{Design matrix or alist specifying how to generate such a matrix.  If
     a list, the first entry is a function name and the second is a list of
     arguments to the function.  In \code{createPubData}, \code{X} is ignored
-    unless \code{mode} is \dQuote{actualGeno} or \dQuote{actualPheno}.}
+    unless \code{mode} is \dQuote{actualGeno}, \dQuote{actualPheno}, or
+    \code{corTest}.}
   \item{y}{
     Numeric vector or matrix or list with the following components:
     \describe{
@@ -61,6 +62,11 @@ createPubData(mode = c("tinysim","ptychoIn",
         typically has either several or no variants that effect a response;
         \code{n=5000}, \code{p=50}, \code{q=5}, and \code{nreps=100}}
       \item{\code{actualGeno}}{Simulate responses for input \code{X}}
+      \item{\code{corTest}}{Simulate \code{q=2} responses for input \code{X}.
+        There will be 10 replicates with the first variant in argument
+        \code{variants} causal for both responses, 10 with the second variant
+        causal, and 20 with variant \code{i} causal for response \code{i}.  No
+        other variant will be causal.}
       \item{\code{actualPheno}}{Put input \code{X} and \code{y} into data
         object}
       \item{\code{fixedOmega}}{Create orthogonal \code{X}, and each variant has
@@ -77,6 +83,8 @@ createPubData(mode = c("tinysim","ptychoIn",
   \item{var.detail}{Data frame with row names same as column names of \code{X};
     must have columns \dQuote{MAF} and \dQuote{GENE}.  Ignored unless
     \code{mode} is \dQuote{actualGeno}.}
+  \item{variants}{Character vector containing names of two columns of \code{X};
+    ignored unless \code{mode} is \dQuote{corTest}.}
 }
 \details{
   We describe \code{createData} and then describe its wrappers
@@ -143,7 +151,8 @@ createPubData(mode = c("tinysim","ptychoIn",
   These functions also serve as additional examples of the use of
   \code{createData}.  For reproducibility, \code{createPubData} first sets the
   random seed to 1234, except that it is set to 4 when \code{mode} equals
-  \dQuote{ptychoIn}.
+  \dQuote{ptychoIn} and it does not set it when \code{mode} equals
+  \dQuote{corTest}.
 
   In \code{createDataBayesModel}, if \code{mode} is \dQuote{exchange}, then
   one \eqn{\omega \sim \mbox{Beta}(12,48)}{omega ~ Beta(12,48)} is drawn

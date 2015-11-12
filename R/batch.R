@@ -1,8 +1,6 @@
 ptycho.all <- function(data, across=c("none","traits","sites"),
                        doGrpIndicator, dir.out,
-                       nreplicates=NULL, ncpu.replicates=1,
-                       replicateIterator=ifelse(ncpu.replicates==1,
-                                             "replicateLoop","replicateLoopMC"),
+                       nreplicates=NULL, parallel.replicates=FALSE,
                        doSetSeed=TRUE, ncolumns=NULL, ...) {
   across <- match.arg(across)
   if (!file.exists(dir.out)) {
@@ -10,36 +8,46 @@ ptycho.all <- function(data, across=c("none","traits","sites"),
     dir.create(dir.out, recursive=TRUE)
   }
   if (is.null(nreplicates)) nreplicates <- seq_along(data$replicates)
+  replicateIterator <- (if (parallel.replicates) "replicateLoopParallel"
+                        else "replicateLoop")
   do.call(replicateIterator, list(data, across, doGrpIndicator, dir.out,
-                                  nreplicates, ncpu.replicates, doSetSeed,
-                                  ncolumns, ...))
+                                  nreplicates, doSetSeed, ncolumns, ...))
 }
 
-# ncpu.replicates is ignored, but having it eliminates annoyance in ptycho.all
 replicateLoop <- function(data, across, doGrpIndicator, dir.out,
-                          nreplicates, ncpu.replicates=1,
-                          doSetSeed, ncolumns, ...) {
+                          nreplicates, doSetSeed, ncolumns, ...) {
   for (nn in nreplicates) {
     ptycho.replicate(data$X, data$replicates[[nn]], across, doGrpIndicator,
                      dir.out, nn, doSetSeed, ncolumns, ...)
   }
 }
 
+checkParallel <- function(checkRNG=FALSE) {
+  if (!requireNamespace("foreach", quietly=TRUE)) {
+    stop("foreach package required for parallel operation")
+  }
+  if (checkRNG && !requireNamespace("doRNG", quietly=TRUE)) {
+    stop("doRNG package required for REPRODUCIBLE parallel operation")
+  }
+  if (foreach::getDoParWorkers() == 1) {
+    warning("No parallel backend registered")
+  }
+}
+
 # CRAN says I must eliminate the NOTE "no visible binding for global variable"
 utils::globalVariables(c("nn"))
 
-replicateLoopMC <- function(data, across, doGrpIndicator, dir.out, nreplicates,
-                            ncpu.replicates=1, doSetSeed, ncolumns, ...) {
-  # If CRAN were not a bureaucracy, I'd use the following two lines and only
-  # Suggest foreach, doMC, and doRNG.
-  #require(doMC)
-  #doMC::registerDoMC(ncpu.replicates)
-  registerDoMC(ncpu.replicates)
-  # Assignment to foo prevents samples from being written to stdout
-  foo <- foreach (nn=nreplicates) %dopar% {
-    ptycho.replicate(data$X, data$replicates[[nn]], across, doGrpIndicator,
-                     dir.out, nn, doSetSeed, ncolumns, ...)
-  }
+replicateLoopParallel <- function(data, across, doGrpIndicator, dir.out,
+                                  nreplicates, doSetSeed, ncolumns, ...) {
+  checkParallel()
+  # Assignment to z prevents samples from being written to stdout
+  z <- foreach::"%dopar%"(foreach::foreach(nn=nreplicates),
+                          {
+                            ptycho.replicate(data$X, data$replicates[[nn]],
+                                             across, doGrpIndicator,
+                                             dir.out, nn, doSetSeed, ncolumns,
+                                             ...)
+                          })
 }
 
 # ncolumns ignored if across equals "traits"
@@ -48,13 +56,13 @@ ptycho.replicate <- function(X, repl, across, doGrpIndicator, dir.out, n.repl,
   Y <- repl$y
   q.in <- ncol(Y)
   omtrue <- repl$omega
-  if (doSetSeed) set.seed(n.repl)
   if (across == "traits") {
     if (q.in == 1) {
       stop("ptycho.replicates: cannot pool phenotypes when only one input")
     }
     smpl <- ptycho.wrap(X, Y, omega.true=omtrue, doGrpIndicator=doGrpIndicator,
-                        dir.out=dir.out, n.repl=n.repl, n.col=1, ...)
+                        dir.out=dir.out, n.repl=n.repl, n.col=1,
+                        random.seed=ifelse(doSetSeed, n.repl, NULL), ...)
   } else {
     q.in <- min(ncolumns, ncol(Y))
     # If I use a*ply or apply here, the object passed into ptycho.wrap is not a
@@ -63,7 +71,8 @@ ptycho.replicate <- function(X, repl, across, doGrpIndicator, dir.out, n.repl,
       smpl <- ptycho.wrap(X, Y[,nn,drop=FALSE],
                           omega.true=omtrue[,nn,drop=FALSE],
                           doGrpIndicator=doGrpIndicator, dir.out=dir.out,
-                          n.repl=n.repl, n.col=nn, ...)
+                          n.repl=n.repl, n.col=nn,
+                          random.seed=ifelse(doSetSeed, n.repl, NULL), ...)
     }
   }
 }
@@ -72,14 +81,10 @@ ptycho.replicate <- function(X, repl, across, doGrpIndicator, dir.out, n.repl,
 # omega.true is used only for initializing chains
 ptycho.wrap <- function(X, y, omega.true=NULL, doGrpIndicator, dir.out, n.repl,
                         n.col, tau.min=0.01, tau.max=10, groups=NULL,
-                        ncpu.chain=1, ...) {
-  ### I needed to fill in gaps in output.
-  #if (file.exists(sprintf("%s/rpl%dcol%d.Rdata", dir.out, n.repl, n.col))) {
-  #  cat(paste("Skipping replicate", n.repl, "column", n.col, "\n"))
-  #  return(NULL)
-  #}
+                        parallel.chains=FALSE, random.seed=NULL, ...) {
   st0 <- startStates(X, y, doGrpIndicator, omega.true, tau.min, tau.max, groups)
-  smpl <- ptycho(X, y, st0, groups, tau.min, tau.max, ncpu=ncpu.chain, ...)
+  smpl <- ptycho(X, y, st0, groups, tau.min, tau.max,
+                 parallel.chains=parallel.chains, random.seed=random.seed, ...)
   save(smpl, file=sprintf("%s/rpl%dcol%d.Rdata", dir.out, n.repl, n.col))
   smpl
 }

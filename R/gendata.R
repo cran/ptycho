@@ -204,6 +204,28 @@ createOmegaActualX <- function(p, q, n.common, probs.common, groups) {
   list(omega=omega, omega.grp=NULL, indic.grp=indic.grp)
 }
 
+# Generate omega for test using correlated variables
+make.createOmegaCorTest <- function(nreps) {
+  count <- 0
+  f <- function(p, q, vars) {
+    if (length(vars) != 2) {
+      stop("createOmegaCorTest: must specify two variants")
+    }
+    count <<- count + 1
+    omega <- matrix(0, nrow=p, ncol=q)
+    if (count <= nreps/2) {
+      omega[vars[1],1] <- 1
+      omega[vars[2],2] <- 1
+    } else if (count <= 3*nreps/4) {
+      omega[vars[1],] <- 1
+    } else {
+      omega[vars[2],] <- 1
+    }
+    list(omega=omega, omega.grp=NULL, indic.grp=NULL)
+  }
+  return(f)
+}
+
 createBeta <- function(indic.var, noise.sd, beta) {
   if (!is.list(beta) || length(beta) != 2) {
     stop("createData: beta must be list of length 2")
@@ -254,14 +276,13 @@ computeEta2 <- function(X, y) {
   eta2
 }
 
-# Modify man pages for tinysim and createData
 createPubData <- function(mode=c("tinysim","ptychoIn",
                                  "exchange","pleiotropy","gene",
-                                 "actualGeno","actualPheno","fixedOmega",
-                                 "uniformEffects"),
-                          X=NULL, y=NULL, var.detail=NULL) {
+                                 "actualGeno","actualPheno","corTest",
+                                 "fixedOmega","uniformEffects"),
+                          X=NULL, y=NULL, var.detail=NULL, variants=NULL) {
   mode <- match.arg(mode)
-  set.seed(1234)
+  if (mode != "corTest") set.seed(1234)
   if (mode == "actualPheno") {
     # Actual data
     data <- createData(X, y)
@@ -273,6 +294,14 @@ createPubData <- function(mode=c("tinysim","ptychoIn",
                        omega=list("createOmegaActualX",
                                   list(n.common=c(10,40),
                                        probs.common=c(0.9,0.1), groups=groups)),
+                       beta=list("createBetaNormal",
+                                 list(tau.min=0.045, tau.max=0.063)))
+  } else if (mode == "corTest") {
+    nreps <- 40
+    createOmegaCorTest <- make.createOmegaCorTest(nreps=nreps)
+    data <- createData(X, y=list(nreps=nreps, q=2, sd=1),
+                       omega=list(createOmegaCorTest,
+                                  list(vars=which(colnames(X) %in% variants))),
                        beta=list("createBetaNormal",
                                  list(tau.min=0.045, tau.max=0.063)))
   } else if (mode == "fixedOmega") {

@@ -1,7 +1,7 @@
 Package: ptycho
 Type: Package
 Title: Bayesian Variable Selection with Hierarchical Priors
-Version: 1.1-2
+Version: 1.1-4
 Author: Laurel Stell and Chiara Sabatti
 Maintainer: Laurel Stell <lstell@stanford.edu>
 URL: web.stanford.edu/~lstell/ptycho/
@@ -14,8 +14,9 @@ Description:
   model for each response.
 License: GPL (>= 2)
 Depends: R (>= 3.0.0)
-Imports: coda, plyr, reshape2, foreach, doMC, doRNG
+Imports: coda, plyr, reshape2
+Suggests: foreach, doRNG
 NeedsCompilation: no
-Packaged: 2015-09-11 21:09:43 UTC; lstell
+Packaged: 2015-11-12 17:53:40 UTC; lstell
 Repository: CRAN
-Date/Publication: 2015-09-12 17:20:11
+Date/Publication: 2015-11-12 19:09:21

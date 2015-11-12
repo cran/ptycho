@@ -27,8 +27,8 @@ ptycho <- function(X, y, initStates, groups=NULL,
                   doGPrior=TRUE, doDetPrior=FALSE, prob.varadd=0.5,
                   isOmegaFixed=FALSE, omega=NULL, omega.grp=NULL,
                   probs.grp=NULL, rho.alpha=10, rho.lambda=rho.alpha,
-                  only.means=FALSE, nburn=0, nthin=1, nSavePerChain, ncpu=1,
-                  chainIterator=ifelse(ncpu==1,"chainLoop","chainLoopRNG")) {
+                  only.means=FALSE, nburn=0, nthin=1, nSavePerChain,
+                  parallel.chains=FALSE, random.seed=NULL) {
   doGrpIndicator <- !is.null(initStates[[1]]$indic.grp)
   if (isOmegaFixed) {
     if (is.null(omega)) {
@@ -65,8 +65,13 @@ ptycho <- function(X, y, initStates, groups=NULL,
                  tau.min=tau.min, tau.max=tau.max, tau.sd=tau.sd)
   st <- llply(initStates,
               function(x) { initAuxVars(data, x, doGPrior, doDetPrior) })
+  chainIterator <- (if (parallel.chains)
+                      if (is.null(random.seed)) "chainLoopParallel"
+                      else "chainLoopRNG"
+                    else "chainLoop")
   z <- do.call(chainIterator,
-               list(data=data, params=params, initStates=st, ncpu=ncpu))
+               list(data=data, params=params, initStates=st,
+                    random.seed=random.seed))
   if (is.null(only.means)) {
     z <- mcmc.list(z)
   } else {
@@ -78,10 +83,10 @@ ptycho <- function(X, y, initStates, groups=NULL,
   z
 }
 
-# Argument ncpu is ignored, but adding it made do.call above a bit cleaner.
-chainLoop <- function(data, params, initStates, ncpu=NULL) {
+chainLoop <- function(data, params, initStates, ncpu=NULL, random.seed=NULL) {
   nchains <- length(initStates)
   z <- vector("list", nchains)
+  if (!is.null(random.seed)) set.seed(random.seed)
   for (nn in seq_len(nchains)) {
     state <- initStates[[nn]]
     z[[nn]] <- mcmcLoop(data, params, state)
@@ -92,18 +97,29 @@ chainLoop <- function(data, params, initStates, ncpu=NULL) {
 # The following is in batch.R and applies here as well.
 #utils::globalVariables(c("nn"))
 
-chainLoopRNG <- function(data, params, initStates, ncpu) {
-  # If CRAN were not a bureaucracy, I'd use the following three lines and only
-  # Suggest foreach, doMC, and doRNG.
-  #require(doMC)
-  #require(doRNG)
-  #doMC::registerDoMC(ncpu)
-  registerDoMC(ncpu)
+# NOT REPRODUCIBLE.
+# random.seed is ignored but included to make do.call() in ptycho() simple.
+chainLoopParallel <- function(data, params, initStates, ncpu, random.seed=NULL) {
   nchains <- length(initStates)
-  z <- foreach(nn=seq_len(nchains)) %dorng% {
-    state <- initStates[[nn]]
-    mcmcLoop(data, params, state)
-  }
+  checkParallel()
+  z <- foreach::"%dopar%"(foreach::foreach(nn=seq_len(nchains)),
+                         {
+                           state <- initStates[[nn]]
+                           mcmcLoop(data, params, state)
+                         })
+  z
+}
+
+# REPRODUCIBLE requires doRNG
+chainLoopRNG <- function(data, params, initStates, ncpu, random.seed) {
+  nchains <- length(initStates)
+  checkParallel(checkRNG=TRUE)
+  set.seed(random.seed)
+  z <- doRNG::"%dorng%"(foreach::foreach(nn=seq_len(nchains)),
+                         {
+                           state <- initStates[[nn]]
+                           mcmcLoop(data, params, state)
+                         })
   z
 }
 

@@ -14,12 +14,10 @@ ptycho(X, y, initStates, groups = NULL,
        doGPrior = TRUE, doDetPrior = FALSE, prob.varadd = 0.5,
        isOmegaFixed = FALSE, omega = NULL, omega.grp = NULL,
        probs.grp = NULL, rho.alpha = 10, rho.lambda = rho.alpha,
-       only.means = FALSE, nburn = 0, nthin = 1, nSavePerChain, ncpu = 1,
-       chainIterator = ifelse(ncpu == 1, "chainLoop", "chainLoopRNG"))
+       only.means = FALSE, nburn = 0, nthin = 1, nSavePerChain,
+       parallel.chains=FALSE, random.seed=NULL)
 ptycho.all(data, across=c("none","traits","sites"), doGrpIndicator,
-           dir.out, nreplicates=NULL, ncpu.replicates=1,
-           replicateIterator=ifelse(ncpu.replicates==1,
-                                    "replicateLoop","replicateLoopMC"),
+           dir.out, nreplicates=NULL, parallel.replicates=FALSE,
            doSetSeed=TRUE, ncolumns=NULL, ...)
 }
 \arguments{
@@ -98,25 +96,18 @@ ptycho.all(data, across=c("none","traits","sites"), doGrpIndicator,
     \code{only.means} is \code{TRUE}, then \code{nSavePerChain + nburn} samples
     are drawn, and only the averages of the last \code{nSavePerChain} samples
     are returned.  Unused if \code{only.means} is not a logical.}
-  \item{ncpu}{Number of CPUs over which to parallelize chains}
-  \item{chainIterator}{Name of function for looping over chains.  Package
-    includes \code{chainLoop}, which runs chains serially (ignoring
-    \code{ncpu}), and \code{chainLoopRNG}, which uses multicores as implemented
-    by the \pkg{doMC} package and also uses the \pkg{doRNG} package to enable
-    reproducibility.  See \code{\link{mcmcLoop}} for information about writing
-    functions to use different parallelization packages.}
+  \item{parallel.chains}{Logical indicating whether to run chains in parallel;
+    see Details.}
+  \item{random.seed}{Random seed to pass to chain iterator; if \code{NULL}, the
+    random seed is not set.  See Details.}
   \item{data}{Data in format output by \code{\link{createData}}}
   \item{across}{Whether to combine information across traits, sites, or
     neither}
   \item{doGrpIndicator}{Whether to use priors that incorporate \code{indic.grp}}
   \item{dir.out}{Directory to which to \code{\link{save}} samples or means}
   \item{nreplicates}{Vector of replicates to run; if \code{NULL}, all will be run}
-  \item{ncpu.replicates}{Number of CPUs over which to parallelize replicates}
-  \item{replicateIterator}{Name of function for looping over replicates.
-    Package includes \code{replicateLoop} to run replicates serially and
-    \code{replicateLoopMC}, which uses multicores as implemented by the
-    \pkg{doMC} package.  See \code{\link{mcmcLoop}} for information about
-    writing functions to use different parallelization packages.}
+  \item{parallel.replicates}{Logical indicating whether to run replicates in
+    parallel; see Details.}
   \item{doSetSeed}{If \code{TRUE}, call \code{set.seed(n.repl)} before running
     samples.}
   \item{ncolumns}{Scalar. If \code{across} is \dQuote{none} or
@@ -129,8 +120,8 @@ ptycho.all(data, across=c("none","traits","sites"), doGrpIndicator,
   These functions run MCMC sampling from the posterior of the linear regression
   models using hierarchical priors described in Stell and Sabatti (2015).  The
   function \code{ptycho.all} is a wrapper of \code{ptycho} to simplify running
-  the simulation experiments in that paper.  These functions determine which
-  priors to use as follows:
+  the simulation experiments over many replicates.  These functions determine
+  which priors to use as follows:
   \itemize{
     \item Standard spike and slab priors that do not combine information
     (basic)\cr
@@ -163,24 +154,12 @@ ptycho.all(data, across=c("none","traits","sites"), doGrpIndicator,
     only included because it is needed to reproduce results in Stell and Sabatti
     (2015).
   }
-  Combining information across both phenotypes and variants is planned for a
-  future release.  These functions perform some checks for compatibility of
-  \code{X}, \code{y}, \code{groups}, and \code{initStates}; but invalid input
-  could lead to unpredictable behavior.  Singular \eqn{X} can result in an
-  error; even strongly correlated covariates can cause difficulties as described
-  by Stell and Sabatti (2015).
-
-The MCMC sampler is written in R.  Our actual data has 5335 subjects, 764
-variants and three traits.  An \code{mcmc.list} containing 50,000 samples for
-each of four chains can take about 5~GB.  Running chains in parallel, it takes
-less than an hour (on a Linux computer with 2.6 GHz processors) to perform
-510,000 samples per chain.  The run time depends primarily on the number of
-entries that are \code{TRUE} in the sampled \code{indic.var} matrices;
-increasing this will increase run times.  A chain that initially has all entries
-of \code{indic.var} set to \code{TRUE} will take longer than one where the model
-is initially empty.  Priors that inflate the posterior expectation of
-\code{indic.var[j,k]} (such as combining information across responses without
-using \code{indic.grp}) will also take longer.
+Combining information across both phenotypes and variants is planned for a
+future release.  These functions perform some checks for compatibility of
+\code{X}, \code{y}, \code{groups}, and \code{initStates}; but invalid input
+could lead to unpredictable behavior.  Singular \eqn{X} can result in an error;
+even strongly correlated covariates can cause difficulties as described by Stell
+and Sabatti (2015).
 
 The simplest way to run the simulations in Stell and Sabatti (2015) is, for
 example,
@@ -189,11 +168,66 @@ example,
   ptycho.all(data=data, across="traits", doGrpIndicator=TRUE,
              dir.out="/path/to/output/dir/",
              only.means=50000*(1:10), nburn=10000)
-  ptycho.all(data=data, across="gene", doGrpIndicator=TRUE,
+  ptycho.all(data=data, across="sites", doGrpIndicator=TRUE,
              dir.out="/path/to/another/dir/",
              groups=createGroupsSim(G=10, ncol(data$X)),
              only.means=50000*(1:10), nburn=10000)
 }
+With these calls, the replicates run sequentially and so do the chains of the
+MCMC sampler; the results will be reproducible because the random seed is set
+for each replicate.
+
+Parallelization is implemented via the \pkg{foreach} package.  The user must not
+only have it installed but also an appropriate parallel backend, which must be
+registered.  To run chains in parallel using the \pkg{doMC}, for example,
+\preformatted{
+  data(ptychoIn)
+  G <- 2; p <- ncol(ptychoIn$X)
+  groups <- createGroupsSim(G, p)
+  state <- list(list(indic.grp=rep(FALSE,G),
+                     indic.var=matrix(FALSE,nrow=p,ncol=1), tau=1),
+                list(indic.grp=rep(TRUE,G),
+                     indic.var=matrix(TRUE,nrow=p,ncol=1), tau=1))
+  require(doMC)
+  registerDoMC(length(state))
+  ptychoOut <- ptycho(X=ptychoIn$X, y=ptychoIn$replicates[[1]]$y,
+                      groups=groups, initStates=state,
+                      only.means=100*seq_len(5), parallel.chains=TRUE)
+}
+The results would not be reproducible, however, even if one set the random seed
+before calling \code{ptycho}.  For reproducible results, pass the random seed
+in the call to \code{ptycho}, which requires that the \pkg{doRNG} package is
+also installed.  Running the chains in parallel when calling \code{ptycho.all}
+also requires the option \code{parallel.chains=TRUE}, which uses \pkg{doRNG}
+unless \code{doSetSeed=FALSE}.  By default, one of the chains starts with all
+variants in the model, so that chain takes much longer to run than do the other
+chains.  Consequently, when running multiple replicates via \code{ptycho.all},
+much greater time savings can be achieved by running the replicates in parallel
+with, for example,
+\preformatted{
+  data <- createPubData("pleiotropy")
+  require(doMC)
+  registerDoMC(8)
+  ptycho.all(data=data, across="traits", doGrpIndicator=TRUE,
+             dir.out="/path/to/output/dir/",
+             only.means=50000*(1:10), nburn=10000)
+}
+In this case, the default behavior of reproducible results does \emph{not}
+require \pkg{doRNG} because the seed is set after each parallel worker is
+created.
+
+We conclude this description with a discussion of the running time of the MCMC
+sampler.  Our actual data has 5335 subjects, 764 variants and three traits.  An
+\code{mcmc.list} containing 50,000 samples for each of four chains can take
+about 5~GB.  Running chains in parallel, it takes less than an hour (on a Linux
+computer with 2.6 GHz processors) to perform 510,000 samples per chain.  The run
+time depends primarily on the number of entries that are \code{TRUE} in the
+sampled \code{indic.var} matrices; increasing this will increase run times.  A
+chain that initially has all entries of \code{indic.var} set to \code{TRUE} will
+take longer than one where the model is initially empty.  Priors that inflate
+the posterior expectation of \code{indic.var[j,k]} (such as combining
+information across responses without using \code{indic.grp}) will also take
+longer.
 }
 \value{
   The results of \code{ptycho.all} are written to files by \code{\link{save}}.
