@@ -19,7 +19,7 @@ phenotype matrices, use \code{\link{ptycho}}.
 
 This package also provides functions to generate simulated data as in Stell and
 Sabatti (2015); see \code{\link{createData}} and
-\url{web.stanford.edu/~lstell/ptycho/}.  Those datasets are not included in this
+\url{http://web.stanford.edu/~lstell/ptycho/}.  Those datasets are not included in this
 package because they have images about 20 MB or larger.  Instead small data
 objects are included for examples; see \link{Data}.
 

@@ -242,8 +242,8 @@ longer.
   in the call to \code{ptycho}.
 
   If \code{only.means} is \code{FALSE}, then \code{ptycho} returns an
-  \code{\link{mcmc.list}} whose length is the same as the length of
-  \code{initStates}.  Each entry in this list is an \code{\link{mcmc}} object
+  \code{\link[coda]{mcmc.list}} whose length is the same as the length of
+  \code{initStates}.  Each entry in this list is an \code{\link[coda]{mcmc}} object
   with \code{nSavePerChain} rows and a column for each entry of \code{indic.var}
   and \code{indic.grp} plus a column for \code{tau}.
 

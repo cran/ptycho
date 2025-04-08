@@ -1,4 +1,4 @@
-40242320350bd4df9590c8493cfea1dc *DESCRIPTION
+b5e31d388cffed942c45573dd9b67fcd *DESCRIPTION
 4274c91e7cfadfca10e8f7d61d66dffe *NAMESPACE
 93297fbe223983254f5ea86f2e02a0fa *R/batch.R
 5b8a3f0e18094ce20523baa3c6681d5b *R/gendata.R
@@ -16,5 +16,5 @@ bf81aa162a14a17cfba04b56cbe66044 *man/createData.Rd
 f25fd7180b0f78a97bd7b072a55aa793 *man/createGroupsSim.Rd
 9f098423b95bab5b38c46b963f6a853b *man/createOrthogonalX.Rd
 fb6e1b84fe0cc2a15d9389576441b708 *man/print.ptycho.Rd
-f409e142633471d497d960a68ccdf080 *man/ptycho-package.Rd
-803a38f9cdd18fe9431a437044e269c4 *man/ptycho.Rd
+ee77ce6f4ff9cd670e5824fe77e48a41 *man/ptycho-package.Rd
+cec04dbcaa708fcbefb88980f4761789 *man/ptycho.Rd
